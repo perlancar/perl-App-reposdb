@@ -110,7 +110,8 @@ $SPEC{list_repos} = {
     summary => 'List repositories registered in repos.db',
     args => {
         %common_args,
-        sort => {
+        sorts => {
+            'x.name.is_plural' => 1,
             schema => ['array*', {
                 of => ['str*', in=>[qw/name -name commit_time -commit_time status_time -status_time pull_time -pull_time/]]
             }],
@@ -129,7 +130,7 @@ sub list_repos {
     my $dbh = _connect_db(\%args);
 
     my @orders;
-    for my $sort (@{ $args{sort} }) {
+    for my $sort (@{ $args{sorts} }) {
         $sort =~ /\A(-)?(\w+)\z/ or return [400, "Invalid sort order `$sort`"];
         push @orders, $2 . ($1 ? " DESC":"");
     }
