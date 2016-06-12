@@ -112,7 +112,8 @@ sub list_repos {
 
     my @res;
     $args{sort} =~ /\A(-)?(\w+)\z/ or return [400, "Invalid sort order"];
-    my $sth = $dbh->prepare("SELECT * FROM repos ORDER BY $2".($1 ? " DESC":""));
+    my $sth = $dbh->prepare("SELECT * FROM repos ORDER BY $2".
+                                ($1 ? " DESC":""));
     $sth->execute;
     while (my $row = $sth->fetchrow_hashref) {
         push @res, $row;
