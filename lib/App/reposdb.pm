@@ -40,6 +40,7 @@ our $db_schema_spec = {
 my %common_args = (
     reposdb_path => {
         schema => 'str*', # XXX path
+        tags => ['common'],
     },
 );
 
