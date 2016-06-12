@@ -1,5 +1,14 @@
 Revision history for App-reposdb
 
+0.002   2016-06-12 (PERLANCAR)
+
+	- ls: Add --sort.
+
+	- [ux] Require reposdb_path instead of defaulting to ~/repos.db.
+
+	- Tweak Rinci metadata: add 'common' argument tag.
+
+
 0.001   2016-06-12 (PERLANCAR)
 
         - First, minimal release.
