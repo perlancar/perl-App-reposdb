@@ -94,6 +94,10 @@ $SPEC{list_repos} = {
     summary => 'List repositories registered in repos.db',
     args => {
         %common_args,
+        sort => {
+            schema => ['str*', in=>[qw/name -name commit_time -commit_time status_time -status_time pull_time -pull_time/]],
+            default => 'name',
+        },
         detail => {
             schema => 'bool',
             cmdline_aliases => {l=>{}},
@@ -107,7 +111,8 @@ sub list_repos {
     my $dbh = _connect_db(\%args);
 
     my @res;
-    my $sth = $dbh->prepare("SELECT * FROM repos");
+    $args{sort} =~ /\A(-)?(\w+)\z/ or return [400, "Invalid sort order"];
+    my $sth = $dbh->prepare("SELECT * FROM repos ORDER BY $2".($1 ? " DESC":""));
     $sth->execute;
     while (my $row = $sth->fetchrow_hashref) {
         push @res, $row;
