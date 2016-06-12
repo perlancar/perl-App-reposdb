@@ -1,5 +1,14 @@
 Revision history for App-reposdb
 
+0.003   2016-06-12 (PERLANCAR)
+
+        - ls: Support multiple --sort.
+
+        - ls: Format timestamps.
+
+        - [doc] Add package description.
+
+
 0.002   2016-06-12 (PERLANCAR)
 
 	- ls: Add --sort.
