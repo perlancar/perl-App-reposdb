@@ -9,9 +9,12 @@ use warnings;
 
 use Perinci::CmdLine::Any;
 
+my $prefix = '/App/reposdb/';
 Perinci::CmdLine::Any->new(
-    url => '/App/reposdb/',
+    url => $prefix,
     subcommands => {
+        ls    => {url => "${prefix}list_repos"},
+        touch => {url => "${prefix}touch_repo"},
     },
     log => 1,
 )->run;
