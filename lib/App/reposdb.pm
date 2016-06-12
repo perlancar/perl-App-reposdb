@@ -41,6 +41,7 @@ my %common_args = (
     reposdb_path => {
         schema => 'str*', # XXX path
         tags => ['common'],
+        req => 1,
     },
 );
 
@@ -56,7 +57,6 @@ sub _set_args_default {
 
     my ($args, $set_repo_default) = @_;
 
-    $args->{reposdb_path} //= "$ENV{HOME}/repos.db";
     if ($set_repo_default) {
         my $repo;
         {
