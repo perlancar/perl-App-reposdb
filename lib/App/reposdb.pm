@@ -9,6 +9,22 @@ use warnings;
 
 our %SPEC;
 
+$SPEC{':package'} = {
+    v => 1.1,
+    summary => 'Manipulate repos.db',
+    description => <<'_',
+
+`repos.db` is a SQLite database that lists repository names along with some
+extra data. They have various uses, but my first use-case for this is to store
+last commit/status/pull time (updated via a post-commit git hook or `gitwrap`).
+This is useful to speed up like syncing of repositories in `Git::Bunch` that
+wants to find out which of the hundreds/thousand+ git repositories are "the most
+recently used" to prioritize these repositories first. Using information from
+`repos.db` is faster than having to `git status` or even stat() each repository.
+
+_
+};
+
 our $db_schema_spec = {
     latest_v => 2,
     install_v1 => [
@@ -181,7 +197,7 @@ sub touch_repo {
 }
 
 1;
-# ABSTRACT: Utility to manipulate repos.db
+# ABSTRACT:
 
 =head1 SYNOPSIS
 
