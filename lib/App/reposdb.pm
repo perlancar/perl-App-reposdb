@@ -147,6 +147,8 @@ sub list_repos {
     if ($args{detail}) {
         $resmeta->{'table.fields'} =
             [qw/name commit_time status_time pull_time/];
+        $resmeta->{'table.field_formats'} =
+            [undef, qw/iso8601_datetime iso8601_datetime iso8601_datetime/];
     } else {
         @res = map { $_->{name} } @res;
     }
