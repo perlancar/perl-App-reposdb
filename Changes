@@ -1,5 +1,11 @@
 Revision history for App-reposdb
 
+0.004   2016-06-15 (PERLANCAR)
+
+        - Add tagging (add --has-tag & --lacks-tag in ls, add subcommands
+          tag/remove-tag/remove-all-tags, add tab completion for repo & tag).
+
+
 0.003   2016-06-12 (PERLANCAR)
 
         - ls: Support multiple --sort.
