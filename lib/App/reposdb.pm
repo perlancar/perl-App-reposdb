@@ -6,6 +6,7 @@ package App::reposdb;
 use 5.010001;
 use strict;
 use warnings;
+use Log::Any::IfLOG '$log';
 
 our %SPEC;
 
@@ -25,8 +26,69 @@ recently used" to prioritize these repositories first. Using information from
 _
 };
 
+sub _complete_repo {
+    my %args = @_;
+    my $word    = $args{word} // '';
+    my $cmdline = $args{cmdline};
+    my $r       = $args{r};
+
+    return undef unless $cmdline;
+
+    # force reading config file
+    $r->{read_config} = 1;
+    my $res = $cmdline->parse_argv($r);
+
+    my $args = $res->[2];
+    _set_args_default($args);
+
+    my $dbh = _connect_db($args);
+    my @repos;
+    my $sth = $dbh->prepare("SELECT name FROM repos");
+    $sth->execute;
+    while (my ($n) = $sth->fetchrow_array) {
+        push @repos, $n;
+    }
+
+    require Complete::Util;
+    Complete::Util::complete_array_elem(
+        word  => $word,
+        array => \@repos,
+    );
+}
+
+sub _complete_tag {
+    my %args = @_;
+    my $word    = $args{word} // '';
+    my $cmdline = $args{cmdline};
+    my $r       = $args{r};
+
+    return undef unless $cmdline;
+
+    # force reading config file
+    $r->{read_config} = 1;
+    my $res = $cmdline->parse_argv($r);
+
+    my $args = $res->[2];
+    _set_args_default($args);
+
+    my $dbh = _connect_db($args);
+    my %tags;
+    my $sth = $dbh->prepare("SELECT tags FROM repos WHERE tags IS NOT NULL");
+    $sth->execute;
+    while (my ($t) = $sth->fetchrow_array) {
+        my @tags = split /,/, $t;
+        $tags{$_} = 1 for @tags;
+    }
+
+    require Complete::Util;
+    Complete::Util::complete_array_elem(
+        word  => $word,
+        array => [keys %tags],
+    );
+}
+
 our $db_schema_spec = {
-    latest_v => 2,
+    latest_v => 3,
     install_v1 => [
         "CREATE TABLE repos (
              name TEXT NOT NULL PRIMARY KEY,
@@ -43,12 +105,16 @@ our $db_schema_spec = {
              pull_time INT
          )",
     ],
+    upgrade_to_v3 => [
+        "ALTER TABLE repos ADD COLUMN tags TEXT",
+    ],
     install => [
         "CREATE TABLE repos (
              name TEXT NOT NULL PRIMARY KEY,
              commit_time INT,
              status_time INT,
-             pull_time INT
+             pull_time INT,
+             tags TEXT
          )",
     ],
 };
@@ -65,6 +131,18 @@ my %repo_arg = (
     repo => {
         schema => 'str*',
         pos => 0,
+        completion => \&_complete_repo,
+    },
+);
+
+my %tags_arg = (
+    tags => {
+        'x.name.is_plural' => 1,
+        schema => ['array*', of=>'str*'],
+        req => 1,
+        pos => 1,
+        greedy => 1,
+        element_completion => \&_complete_tag,
     },
 );
 
@@ -73,7 +151,7 @@ sub _set_args_default {
 
     my ($args, $set_repo_default) = @_;
 
-    if ($set_repo_default) {
+    if ($set_repo_default && !defined($args->{repo})) {
         my $repo;
         {
             my $cwd = Cwd::getcwd();
@@ -116,10 +194,26 @@ $SPEC{list_repos} = {
                 of => ['str*', in=>[qw/name -name commit_time -commit_time status_time -status_time pull_time -pull_time/]]
             }],
             default => ['name'],
+            tags => ['category:sorting'],
         },
         detail => {
             schema => 'bool',
             cmdline_aliases => {l=>{}},
+            tags => ['category:field-selection'],
+        },
+        has_tags => {
+            'x.name.is_plural' => 1,
+            'x.name.singular' => 'has_tag',
+            schema => ['array*', of=>'str*'],
+            element_completion => \&_complete_tag,
+            tags => ['category:filtering'],
+        },
+        lacks_tags => {
+            'x.name.is_plural' => 1,
+            'x.name.singular' => 'lacks_tag',
+            schema => ['array*', of=>'str*'],
+            element_completion => \&_complete_tag,
+            tags => ['category:filtering'],
         },
     },
 };
@@ -139,14 +233,34 @@ sub list_repos {
     my $sth = $dbh->prepare($sql);
     $sth->execute;
     my @res;
+  ROW:
     while (my $row = $sth->fetchrow_hashref) {
+        if ($args{has_tags} && @{ $args{has_tags} }) {
+            my @row_tags = split ',', ($row->{tags} // '');
+            my $found;
+            for my $t (@{ $args{has_tags} }) {
+                if (grep { $t eq $_ } @row_tags) {
+                    $found++; last;
+                }
+            }
+            next ROW unless $found;
+        }
+        if ($args{lacks_tags} && @{ $args{lacks_tags} }) {
+            my @row_tags = split ',', ($row->{tags} // '');
+            my $found;
+            for my $t (@{ $args{lacks_tags} }) {
+                if (grep { $t eq $_ } @row_tags) {
+                    next ROW;
+                }
+            }
+        }
         push @res, $row;
     }
 
     my $resmeta = {};
     if ($args{detail}) {
         $resmeta->{'table.fields'} =
-            [qw/name commit_time status_time pull_time/];
+            [qw/name commit_time status_time pull_time tags/];
         $resmeta->{'table.field_formats'} =
             [undef, qw/iso8601_datetime iso8601_datetime iso8601_datetime/];
     } else {
@@ -202,6 +316,90 @@ sub touch_repo {
         $dbh->do("UPDATE repos SET pull_time=? WHERE name=?", {},
                  $now, $args{repo});
     }
+    $dbh->commit;
+    [200];
+}
+
+$SPEC{add_repo_tag} = {
+    v => 1.1,
+    args => {
+        %common_args,
+        %repo_arg,
+        %tags_arg,
+    },
+};
+sub add_repo_tag {
+    my %args = @_;
+
+    _set_args_default(\%args);
+    my $dbh = _connect_db(\%args);
+
+    return [400, "Please specify repo name"] unless defined $args{repo};
+
+    $dbh->begin_work;
+    $dbh->do("INSERT OR IGNORE INTO repos (name) VALUES (?)",
+             {}, $args{repo});
+    my ($tags) = $dbh->selectrow_array("SELECT tags FROM repos WHERE name=?",
+                                       {}, $args{repo});
+    $tags //= '';
+    my %tags = map { $_ => 1 } split /,/, $tags;
+    $tags{$_} = 1 for @{ $args{tags} };
+    $dbh->do("UPDATE repos SET tags=? WHERE name=?",
+             {}, join(",", sort keys %tags), $args{repo});
+    $dbh->commit;
+    [200];
+}
+
+$SPEC{remove_repo_tag} = {
+    v => 1.1,
+    args => {
+        %common_args,
+        %repo_arg,
+        %tags_arg,
+    },
+};
+sub remove_repo_tag {
+    my %args = @_;
+
+    _set_args_default(\%args, 1);
+    my $dbh = _connect_db(\%args);
+
+    return [400, "Please specify repo name"] unless defined $args{repo};
+
+    $dbh->begin_work;
+    my ($tags) = $dbh->selectrow_array("SELECT tags FROM repos WHERE name=?",
+                                       {}, $args{repo});
+    defined($tags) or return [404, "No such repo '$args{repo}'"];
+
+    my %tags = map { $_ => 1 } split /,/, $tags;
+    delete $tags{$_} for @{ $args{tags} };
+    $dbh->do("UPDATE repos SET tags=? WHERE name=?",
+             {}, join(",", sort keys %tags), $args{repo});
+    $dbh->commit;
+    [200];
+}
+
+$SPEC{remove_all_repo_tags} = {
+    v => 1.1,
+    args => {
+        %common_args,
+        %repo_arg,
+    },
+};
+sub remove_all_repo_tags {
+    my %args = @_;
+
+    _set_args_default(\%args, 1);
+    my $dbh = _connect_db(\%args);
+
+    return [400, "Please specify repo name"] unless defined $args{repo};
+
+    $dbh->begin_work;
+    my ($tags) = $dbh->selectrow_array("SELECT tags FROM repos WHERE name=?",
+                                       {}, $args{repo});
+    defined($tags) or return [404, "No such repo '$args{repo}'"];
+    $dbh->do("UPDATE repos SET tags=NULL WHERE name=?",
+             {}, $args{repo});
     $dbh->commit;
     [200];
 }

@@ -13,8 +13,11 @@ my $prefix = '/App/reposdb/';
 Perinci::CmdLine::Any->new(
     url => $prefix,
     subcommands => {
-        ls    => {url => "${prefix}list_repos"},
-        touch => {url => "${prefix}touch_repo"},
+        ls                => {url => "${prefix}list_repos"},
+        touch             => {url => "${prefix}touch_repo"},
+        tag               => {url => "${prefix}add_repo_tag"},
+        'remove-tag'      => {url => "${prefix}remove_repo_tag"},
+        'remove-all-tags' => {url => "${prefix}remove_all_repo_tags"},
     },
     log => 1,
 )->run;
