@@ -1,5 +1,3 @@
-Revision history for App-reposdb
-
 0.004   2016-06-15 (PERLANCAR)
 
         - Add tagging (add --has-tag & --lacks-tag in ls, add subcommands
