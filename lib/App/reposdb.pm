@@ -1,6 +1,8 @@
 package App::reposdb;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010001;
@@ -272,6 +274,7 @@ sub list_repos {
 
 $SPEC{touch_repo} = {
     v => 1.1,
+    summary => "Touch the timestamp(s) of a repo (by default current repo)",
     args => {
         %common_args,
         %repo_arg,
@@ -320,8 +323,36 @@ sub touch_repo {
     [200];
 }
 
+$SPEC{get_repo_metadata} = {
+    v => 1.1,
+    summary => 'Get metadata for a repo (by default the current repo)',
+    args => {
+        %common_args,
+        %repo_arg,
+    },
+};
+sub get_repo_metadata {
+    my %args = @_;
+
+    _set_args_default(\%args, 1);
+    my $dbh = _connect_db(\%args);
+
+    return [400, "Please specify repo name"] unless defined $args{repo};
+
+    my $res = $dbh->selectrow_hashref(
+        "SELECT commit_time,status_time,pull_time,tags FROM repos WHERE name=?", {},
+        $args{repo}) // {};
+    for (qw/commit_time status_time pull_time/) {
+        if ($res->{$_}) {
+            $res->{"${_}_fmt"} = scalar localtime $res->{$_};
+        }
+    }
+    [200, "OK", $res];
+}
+
 $SPEC{add_repo_tag} = {
     v => 1.1,
+    summary => 'Add a tag to a repo (by default the current repo)',
     args => {
         %common_args,
         %repo_arg,
@@ -352,6 +383,7 @@ sub add_repo_tag {
 
 $SPEC{remove_repo_tag} = {
     v => 1.1,
+    summary => 'Remove tag from a repo (by default the current repo)',
     args => {
         %common_args,
         %repo_arg,
@@ -381,6 +413,7 @@ sub remove_repo_tag {
 
 $SPEC{remove_all_repo_tags} = {
     v => 1.1,
+    summary => 'Remove all tags from a repo (by default the current repo)',
     args => {
         %common_args,
         %repo_arg,

@@ -1,6 +1,8 @@
 #!perl
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010001;
@@ -18,6 +20,7 @@ Perinci::CmdLine::Any->new(
         tag               => {url => "${prefix}add_repo_tag"},
         'remove-tag'      => {url => "${prefix}remove_repo_tag"},
         'remove-all-tags' => {url => "${prefix}remove_all_repo_tags"},
+        get               => {url => "${prefix}get_repo_metadata"},
     },
     log => 1,
 )->run;
